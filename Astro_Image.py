@@ -6,25 +6,11 @@ Created on Mon Feb  6 10:44:28 2023
 """
 
 #import package
-from sklearn import preprocessing
 from sklearn.cluster import DBSCAN
-import pandas as pd
-import scipy as sp
 from matplotlib import pyplot as plt
 import numpy as np
-from scipy.special import gamma, factorial
 from scipy.optimize import curve_fit
-from scipy import signal 
 import math
-from scipy.fft import fft, fftfreq, fftshift,rfft,rfftfreq, ifft
-from scipy.stats import norm
-import scipy.stats as ss
-from scipy.stats import levy  
-from scipy import interpolate
-from scipy.interpolate import CubicSpline
-from sklearn.linear_model import LinearRegression
-import  yfinance  as yf
-import plotly.graph_objects as go
 from astropy.io import fits
 
 '''
@@ -172,6 +158,7 @@ def calculate_back(x):
             back_s += x[i]
             n += 1
     I_background = back_s/n
+    print('Average background intensity is '+ str(I_background))
     return I_background
     
 MAGZPT = header_0["MAGZPT"]
@@ -235,11 +222,17 @@ def makeGaussian(size, fwhm = 3, center=None):
 
     return distri
 
+def clusterAndNoise(eps_v,x):   
+    clustering = DBSCAN(eps=eps_v).fit(x)
+    labels = clustering.labels_
+    n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+    n_noise_ = list(labels).count(-1)
+    print("Estimated number of clusters: %d" % n_clusters_)
+    print("Estimated number of noise points: %d" % n_noise_)
+    return [n_clusters_,n_noise_]
+
 #%%
-
-
 data_1_back = back(data_1,4000)        
-print(data_1_back)
 
 plt.figure()
 x_contourf, y_contourf = np.shape(data_1_back)
@@ -249,13 +242,10 @@ plt.clabel(contours, inline=True, fontsize=8)
 plt.colorbar()    
 plt.show()
 
-
 data_test1 = data_1_back
 maxcount = count(data_test1,1)
 splited_cluster = split_cluster(maxcount)
 error_mask_signal = error_label(splited_cluster)
-
-
 
 plt.figure()
 x_contourf_test, y_contourf_test = np.shape(data_test1)
@@ -274,25 +264,18 @@ for i in range(0,len(splited_cluster)):
 plt.legend()
 plt.show()
 
-
-clustering = DBSCAN(eps=3).fit(maxcount)
-labels = clustering.labels_
-unique_labels = set(labels)
-n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
-n_noise_ = list(labels).count(-1)
-
-print("Estimated number of clusters: %d" % n_clusters_)
-print("Estimated number of noise points: %d" % n_noise_)
-
+n_clusters_noise = clusterAndNoise(3,maxcount)
 
 intensity_background = calculate_back(data_f)
-print('Average background intensity is '+ str(intensity_background))
 
 all_mag = find_magnitude(splited_cluster,data_1,error_mask_signal)
 
 
 
 #%%
+'''
+Previous Work for Gaussian
+'''
 #Clean data
 data=[]
 for i in range(0,len(data_f)):
