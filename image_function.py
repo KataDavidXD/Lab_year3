@@ -25,12 +25,16 @@ from sklearn.linear_model import LinearRegression
 import  yfinance  as yf
 import plotly.graph_objects as go
 from astropy.io import fits
-#from Astro_Image import back_V
-#import package
-#print(back_V)
-global back_V
-back_V = 3499
-#%%
+
+back_V = 3470
+#error_length_t = 1600
+error_length_t = 1450
+'''
+from Astro_Image import back_back
+background_V = back_back()
+back_V = background_V.Value
+'''
+
 '''
 Remove Edge
 '''        
@@ -42,6 +46,7 @@ def remove_edge(x,top=0,b1=0,b2=0,left=0,rifht=0):
     for i in range(0,2570):
         for n in range(0,25):
             x[n,i]=0
+
     #bottom left
     for i in range(0,425):
         for n in range(0,120):
@@ -57,6 +62,39 @@ def remove_edge(x,top=0,b1=0,b2=0,left=0,rifht=0):
     for i in range(2478,2570):
         for n in range(0,4611):
             x[n,i]=0
+
+    for i in range(0,26):
+        for n in range(0,4611):
+            x[n,i]=0
+    
+
+
+    for i in range(0,97):
+        for n in range(0,4611):
+            x[n,i]=0
+
+    for i in range(0,2570):
+        for n in range(0,100):
+            x[n,i]=0
+    
+
+    for i in range(0,2570):
+        for n in range(4515,4611):
+            x[n,i]=0  
+
+    for i in range(2165,2476):
+        for n in range(4428,4515):
+            x[n,i]=0        
+
+    for i in range(2353,2476):
+        for n in range(4210,4513):
+            x[n,i]=0        
+    
+    for i in range(2476,2570):
+        for n in range(0,4611):
+            x[n,i]=0        
+
+
     return x            
 
 '''
@@ -110,7 +148,7 @@ def sperate_array(x):
 
 
 def split_cluster(x):    
-    clustering = DBSCAN(eps=3).fit(x)
+    clustering = DBSCAN(eps=10,min_samples=5).fit(x)
     print('Density clustering machine learning algorithm is running, please wait')
     labels = clustering.labels_
     unique_labels = set(labels)    
@@ -129,23 +167,35 @@ def error_label(cluster):
     e_mask_signal = np.zeros_like(cluster)
     for i in range(0,len(cluster)):
         xi,yi = sperate_array(cluster[i])
-        if i == len(cluster)-1:
+        if i == len(cluster)-1 and len(cluster) >1:
             e_mask_signal[i] = 1
-        elif len(cluster[i]) > 200000:
+        elif len(cluster[i]) > error_length_t:
             e_mask_signal[i] = 2
     return e_mask_signal
-
+'''
 def plot_sperated_clusters(s_cluster):
     for i in range(0,len(s_cluster)):
         xi,yi = sperate_array(s_cluster[i])
-        if i == len(s_cluster)-1:
+        if i == len(s_cluster)-1 and len(s_cluster) >1:
             plt.scatter(yi,xi,color= 'black',label='Noise')
         elif len(s_cluster[i]) > 200000:
             plt.scatter(yi,xi,color= 'black',label='Detection Error')
         else:
             #plt.scatter(yi,xi,label=str(i))
             plt.scatter(yi,xi)
-
+'''
+def plot_sperated_clusters(s_cluster,inten):
+    for i in range(0,len(s_cluster)):
+        xi,yi = sperate_array(s_cluster[i])
+        if i == len(s_cluster)-1 and len(s_cluster) > 1:
+            plt.scatter(yi,xi,color= 'black',label='Noise',zorder=1)
+        elif len(s_cluster[i]) > error_length_t:
+            plt.scatter(yi,xi,color= 'black',label='Detection Error',zorder=2)
+        else:
+            #plt.scatter(yi,xi,label=str(i))
+            sz=1
+            c=inten[xi,yi]
+            plt.scatter(yi,xi,sz,c,cmap='Reds',zorder=3)
 
 '''
 Background Flux 
@@ -157,7 +207,7 @@ def calculate_back(x):
     for i in range(0,len(x)):
         n = 0
         back_s = 0
-        if x[i] < 4000:
+        if x[i] < back_V:
             back_s += x[i]
             n += 1
     I_background = back_s/n
@@ -227,16 +277,16 @@ def makeGaussian(size, fwhm = 3, center=None):
                 distri[n,i]=0
 
     return distri
-
+'''
 def clusterAndNoise(eps_v,x):   
-    clustering = DBSCAN(eps=eps_v).fit(x)
+    clustering = DBSCAN(eps=5,min_samples=10).fit(x)
     labels = clustering.labels_
     n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
     n_noise_ = list(labels).count(-1)
     print("Estimated number of clusters: %d" % n_clusters_)
     print("Estimated number of noise points: %d" % n_noise_)
     return [n_clusters_,n_noise_]
-
+'''
 '''
 𝑙𝑜𝑔 𝑁 ( 𝑚 ) = 0 . 6 𝑚 + 𝑐𝑜𝑛𝑠𝑡𝑎𝑛𝑡
 '''
@@ -251,7 +301,7 @@ def get_N(x,m):
             if intensity > m:
                 N += 1
     print('Star Counting finished')
-    N_log = np.log(N)
+    N_log = np.log10(N)
     return N_log
 
 
@@ -260,9 +310,21 @@ def log10it(x):
     y = []
     for i in range(0,len(x)):
         if x[i] >0:
-            y.append(math.log(x[i]))
-    return y
-def linear(x,c):
-    y = 0.6 * x + c
+            y.append(math.log10(x[i]))
+    print('Checking the number of the stars')
     return y
 
+def linear(x,c):
+    y =  -math.log10(0.6) * x + c
+    #y = np.log10(y)
+    return y
+
+def llinear(x,c):
+    y =  (0.6) * x + c
+    #y = np.log10(y)
+    return y
+
+def newlinear(x,a,c):
+    y =  a * x + c
+    #y = np.log10(y)
+    return y
